@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<zone>
+  <short>vertos</short>
+  <description>vertos workstation: no inbound services except DHCPv6 replies. Generic, nothing host-specific. No forward element: no forwarding between interfaces in this zone.</description>
+  <service name="dhcpv6-client"/>
+</zone>

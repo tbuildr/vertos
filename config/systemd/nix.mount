@@ -1,0 +1,14 @@
+[Unit]
+Description=Persistent Nix store
+Requires=nix-store-root.service
+After=nix-store-root.service
+Before=nix-daemon.service
+
+[Mount]
+What=/var/lib/nix
+Where=/nix
+Type=none
+Options=bind
+
+[Install]
+WantedBy=local-fs.target

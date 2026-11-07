@@ -1,0 +1,24 @@
+# Defaults
+cosign.key
+_build_*
+output
+_build-*/**
+# Signing and authentication material
+.env
+.env.*
+auth.json
+secrets/
+credentials/
+# Generated disk images and builds
+*.iso
+*.qcow2
+*.raw
+*.img
+build/
+# Editor files
+*.swp
+*~
+# Atomic image stuff
+*_chunkah_*
+*_rpm-ostree_*
+

@@ -1,0 +1,14 @@
+[Unit]
+Description=Reapply SELinux context to NVIDIA device nodes
+DefaultDependencies=no
+After=systemd-udev-settle.service
+Before=podman.socket
+ConditionPathExistsGlob=/dev/nvidia*
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/restorecon -Rv /dev/nvidia0 /dev/nvidiactl /dev/nvidia-uvm /dev/nvidia-uvm-tools /dev/nvidia-modeset /dev/nvidia-caps
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
