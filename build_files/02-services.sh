@@ -11,6 +11,13 @@ systemctl enable greetd
 systemctl enable pcscd.socket
 systemctl enable mullvad-daemon.service
 
+# Secret Service. Fedora 45 replaced gnome-keyring with oo7. oo7-daemon has no
+# D-Bus activation by design and only gnome-session starts it, so enable it for
+# every user session: pam_oo7 (in greetd's PAM stack) hands the login password
+# to it at login. See linux-credentials/oo7#603.
+systemctl --global enable oo7-daemon.service
+test -L /etc/systemd/user/default.target.wants/oo7-daemon.service
+
 # ClamAV signatures for clamscan-host (Home Manager). clamav-filesystem creates
 # clamupdate via sysusers.d, but ships /var/lib/clamav only as image /var
 # content, which existing deployments never receive: create it at boot.
