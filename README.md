@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/vertos.png" alt="vertOS logo" width="350">
+</p>
+
 # vertos
 
 vertos is my personal, opinionated Bazzite-derived bootable container image.
@@ -13,13 +17,11 @@ Brave Browser, Chromium, Yubikey Manager, Mullvad-VPN that are intentionally
 baked into the image along with Ollama service and container quadlet. Inbound
 networking is locked down by default: a deny-by-default firewalld zone and no
 LLMNR/mDNS (see [Firewall and LAN hardening](#firewall-and-lan-hardening)).
+Secrets go to Fedora's oo7 Secret Service, unlocked at login (see
+[Secret Service (oo7)](#secret-service-oo7)).
 
 Built with the
 [Universal Blue image-template](https://github.com/ublue-os/image-template).
-
-<p align="center">
-  <img src="assets/vertos.png" alt="vertOS logo" width="350">
-</p>
 
 > [!WARNING]
 > vertos is a personal project — not official Bazzite, Universal Blue, Niri or
@@ -293,6 +295,75 @@ sudo firewall-cmd --reload && sudo systemctl restart systemd-resolved
 `/etc` stays writable by root on any atomic system. The image stops accidental
 drift and makes rollback reliable, but it doesn't protect against someone who
 already has root. `config-diff` is how you spot local changes.
+
+## Secret Service (oo7)
+
+Fedora 45 replaced gnome-keyring with **oo7** as the Secret Service
+(`org.freedesktop.secrets`): the store `gh`, Brave/Chromium, and other apps use
+for tokens and passwords. The Bazzite base ships `oo7-daemon`, `oo7-portal` and
+`pam_oo7`, but under Niri nothing starts the daemon:
+
+- oo7 ships **no D-Bus activation file**, by design. Only gnome-session starts
+  it, and the unit's preset is disabled
+  ([linux-credentials/oo7#603](https://github.com/linux-credentials/oo7/issues/603)).
+- `pam_oo7` hands the login password to the daemon at login. Its helper waits
+  only 120 seconds, so the daemon must start with the session, not on first use.
+
+| What                                                                    | In the image                                             | Source in this repo                      |
+| ----------------------------------------------------------------------- | -------------------------------------------------------- | ---------------------------------------- |
+| `oo7-daemon.service` enabled for every user (`default.target`)          | `/etc/systemd/user/default.target.wants/oo7-daemon.service` | `build_files/02-services.sh` (`systemctl --global enable`) |
+| Login keyring unlocked with the login password                          | `pam_oo7` in `/usr/lib/pam.d/greetd` (from the base)     | —                                        |
+
+The build fails if the global enable is missing.
+
+**Don't** use oo7's alternative unlock (a TPM-encrypted
+`oo7.keyring-encryption-password` credential in `~/.config/credstore.encrypted`):
+root plus the TPM can decrypt it without your password. The PAM route keeps the
+password in memory only during login.
+
+The Secret **portal** for Flatpak apps is configured per user, not in the image.
+Set it to oo7's portal in `~/.config/xdg-desktop-portal/niri-portals.conf`
+(mine is managed by Home Manager):
+
+```ini
+org.freedesktop.impl.portal.Secret=oo7-portal;
+```
+
+**Checking a machine:**
+
+```sh
+systemctl --user is-active oo7-daemon                     # active
+busctl --user get-property org.freedesktop.secrets \
+  /org/freedesktop/secrets/collection/login \
+  org.freedesktop.Secret.Collection Locked                # b false (unlocked at login)
+gh auth status                                            # "(keyring)", not a hosts.yml path
+journalctl -b --user -u oo7-daemon --no-pager | tail -20
+```
+
+**Expected noise, not errors:**
+
+- `oo7_daemon_login: ... Secret delivered to daemon` lines on tty1 between
+  tuigreet and Niri: the PAM helper logging to the VT it was started on.
+- `Backend call failed: ... A valid App ID is required` from
+  `xdg-desktop-portal`: a non-Flatpak app (Brave here) trying the Secret portal.
+  oo7-portal only serves sandboxed apps; the app falls back to the Secret
+  Service directly.
+
+**Moving an existing machine to this image.** If you enabled the daemon by hand
+before (`systemctl --user enable oo7-daemon.service`), remove the per-user
+enable after upgrading, so the image is the only source:
+
+```sh
+systemctl --user disable oo7-daemon.service
+ls -l /etc/systemd/user/default.target.wants/ | grep oo7   # global link still there
+```
+
+If the login keyring was created with a different password from your login
+password, PAM can't unlock it and you'll get an "Authentication required" prompt
+each session. Unlock it once with the old password, then change it to match.
+
+Apps that kept secrets elsewhere before a Secret Service existed (browsers) may
+need you to sign in again once oo7 is running.
 
 ## Dependency update PRs
 

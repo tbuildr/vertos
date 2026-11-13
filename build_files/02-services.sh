@@ -18,6 +18,11 @@ systemctl enable mullvad-daemon.service
 systemctl --global enable oo7-daemon.service
 test -L /etc/systemd/user/default.target.wants/oo7-daemon.service
 
+# gcr ships GNOME's ssh-agent socket. The session uses Home Manager's ssh-agent
+# (YubiKey askpass), so mask gcr's to avoid a second, keyless agent.
+systemctl --global mask gcr-ssh-agent.socket gcr-ssh-agent.service
+test "$(readlink /etc/systemd/user/gcr-ssh-agent.socket)" = /dev/null
+
 # ClamAV signatures for clamscan-host (Home Manager). clamav-filesystem creates
 # clamupdate via sysusers.d, but ships /var/lib/clamav only as image /var
 # content, which existing deployments never receive: create it at boot.
